@@ -12,6 +12,7 @@ export const getGroup = (groupId) => api.get(`/groups/${groupId}`).then(r => r.d
 
 // People
 export const addPerson = (groupId, name) => api.post(`/groups/${groupId}/people`, { name }).then(r => r.data);
+export const updatePerson = (groupId, personId, name) => api.put(`/groups/${groupId}/people/${personId}`, { name }).then(r => r.data);
 export const getPeople = (groupId) => getGroup(groupId).then(g => g.people || []);
 
 // Events

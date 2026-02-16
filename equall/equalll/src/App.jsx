@@ -9,6 +9,8 @@ export default function App() {
   const [groupId, setGroupId] = useState(null);
   const [group, setGroup] = useState(null);
 
+  console.log('App rendering. groupId:', groupId, 'group:', group);
+
   useEffect(() => {
     if (!groupId) return;
     getGroup(groupId).then(setGroup).catch(() => setGroup(null));
@@ -17,8 +19,15 @@ export default function App() {
   async function handleStartGroup(numPeople, groupName) {
     try {
       const g = await createGroup(groupName.trim());
+      // Create the specified number of people with placeholder names
+      const { addPerson } = await import('./api');
+      for (let i = 0; i < numPeople; i++) {
+        await addPerson(g.id, `Person ${i + 1}`);
+      }
+      // Fetch the updated group with people
+      const updatedGroup = await getGroup(g.id);
       setGroupId(g.id);
-      setGroup(g);
+      setGroup(updatedGroup);
     } catch (err) {
       alert('Error creating group: ' + err.message);
     }
@@ -76,7 +85,7 @@ export default function App() {
             marginBottom: 18,
             justifyContent: 'space-between',
           }}>
-            <h1 style={{ margin: 0 }}>Equall — Split bills like Billzer</h1>
+            <h1 style={{ margin: 0 }}>EquaLL — Split bills for shared group expenses</h1>
             <button
               onClick={() => { setGroupId(null); setGroup(null); }}
               style={{

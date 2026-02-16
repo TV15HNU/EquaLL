@@ -10,12 +10,13 @@ import java.net.URI;
 import java.util.*;
 
 /**
- * Controller for Events and Participants.
- * - Create event: POST /api/groups/{groupId}/events
- * - Add participants: POST /api/groups/{groupId}/events/{eventId}/participants
- * - List events: GET /api/groups/{groupId}/events
+ * EventController - simplified participants payload:
+ * Accepts participants as array of personIds or objects with personId.
+ * Example bodies:
+ * { "participants": [1,2] }
+ * { "participants": [ { "personId": 1 }, { "personId": 2 } ] }
  *
- * Duplicate-safety: before inserting a participant we check repository for existing (eventId, personId).
+ * Duplicate-safe and ignores 'share' (uses default share = 1).
  */
 @RestController
 @RequestMapping("/api/groups/{groupId}/events")
@@ -37,29 +38,7 @@ public class EventController {
     }
 
     // -------------------------------
-    // DTOs (small inner classes)
-    // -------------------------------
-    public static class ParticipantRequest {
-        private Long personId;
-        private BigDecimal share = BigDecimal.ONE;
-
-        public ParticipantRequest() {}
-        public Long getPersonId() { return personId; }
-        public void setPersonId(Long personId) { this.personId = personId; }
-        public BigDecimal getShare() { return share; }
-        public void setShare(BigDecimal share) { this.share = share; }
-    }
-
-    public static class ParticipantListRequest {
-        private List<ParticipantRequest> participants = new ArrayList<>();
-
-        public ParticipantListRequest() {}
-        public List<ParticipantRequest> getParticipants() { return participants; }
-        public void setParticipants(List<ParticipantRequest> participants) { this.participants = participants; }
-    }
-
-    // -------------------------------
-    // 1) CREATE EVENT
+    // CREATE EVENT (same as before)
     // -------------------------------
     @PostMapping
     public ResponseEntity<?> createEvent(
@@ -116,74 +95,86 @@ public class EventController {
     }
 
     // -------------------------------
-    // 2) ADD PARTICIPANTS (duplicate-safe)
+    // ADD PARTICIPANTS (no shares, duplicates safe)
+    // Body examples:
+    // { "participants": [1,2] }
+    // { "participants": [ {"personId":1}, {"personId":2} ] }
     // -------------------------------
-    /**
-     * Request body:
-     * {
-     *   "participants": [
-     *     { "personId": 1, "share": 1 },
-     *     { "personId": 2, "share": 1 }
-     *   ]
-     * }
-     */
     @PostMapping("/{eventId}/participants")
     public ResponseEntity<?> addParticipants(
             @PathVariable Long groupId,
             @PathVariable Long eventId,
-            @RequestBody ParticipantListRequest request) {
+            @RequestBody Map<String, Object> body) {
 
-        // Validate group exists
+        // validate group
         if (groupRepo.findById(groupId).isEmpty()) {
             return ResponseEntity.badRequest().body("Group not found");
         }
 
-        // Validate event exists
+        // validate event
         Optional<Event> eventOpt = eventRepo.findById(eventId);
-        if (eventOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body("Event not found");
-        }
+        if (eventOpt.isEmpty()) return ResponseEntity.badRequest().body("Event not found");
         Event event = eventOpt.get();
 
+        // parse participants entry
+        if (!body.containsKey("participants")) {
+            return ResponseEntity.badRequest().body("Missing 'participants' in body");
+        }
+
+        Object pObj = body.get("participants");
+        if (!(pObj instanceof List)) return ResponseEntity.badRequest().body("'participants' must be an array");
+
+        List<?> list = (List<?>) pObj;
         List<EventParticipant> saved = new ArrayList<>();
 
-        for (ParticipantRequest pr : request.getParticipants()) {
-            if (pr == null || pr.getPersonId() == null) continue;
-            Long personId = pr.getPersonId();
+        for (Object item : list) {
+            Long personId = null;
 
-            // DUPLICATE CHECK (repository query)
-            Optional<EventParticipant> existing = participantRepo.findByEventIdAndPersonId(eventId, personId);
-            if (existing.isPresent()) {
-                // skip duplicate silently (or collect info to return if you prefer)
-                continue;
+            if (item instanceof Number) {
+                personId = ((Number) item).longValue();
+            } else if (item instanceof Map) {
+                Object pid = ((Map<?,?>) item).get("personId");
+                if (pid instanceof Number) personId = ((Number) pid).longValue();
+                else if (pid != null) {
+                    try { personId = Long.valueOf(pid.toString()); } catch (Exception ignored) {}
+                }
+            } else if (item instanceof String) {
+                try { personId = Long.valueOf((String) item); } catch (Exception ignored) {}
             }
 
-            // Check person exists
+            if (personId == null) continue;
+
+            // check person exists
             Optional<Person> personOpt = personRepo.findById(personId);
             if (personOpt.isEmpty()) continue;
 
-            // Create participant
-            EventParticipant ep = new EventParticipant();
-            ep.setEvent(event);
-            ep.setPerson(personOpt.get());
-            ep.setShare(pr.getShare() == null ? BigDecimal.ONE : pr.getShare());
-
-            EventParticipant savedEp;
-            try {
-                savedEp = participantRepo.save(ep);
-            } catch (Exception ex) {
-                // in case DB unique constraint triggers (race-condition), skip
+            // duplicate check (eventId + personId)
+            Optional<EventParticipant> existing = participantRepo.findByEventIdAndPersonId(eventId, personId);
+            if (existing.isPresent()) {
+                // skip duplicate
                 continue;
             }
 
-            saved.add(savedEp);
+            // create participant with default share = 1
+            EventParticipant ep = new EventParticipant();
+            ep.setEvent(event);
+            ep.setPerson(personOpt.get());
+            ep.setShare(BigDecimal.ONE);
+
+            try {
+                EventParticipant savedEp = participantRepo.save(ep);
+                saved.add(savedEp);
+            } catch (Exception ex) {
+                // unique constraint or other db error -> skip
+                continue;
+            }
         }
 
         return ResponseEntity.ok(saved);
     }
 
     // -------------------------------
-    // 3) LIST EVENTS FOR GROUP
+    // LIST EVENTS FOR GROUP
     // -------------------------------
     @GetMapping
     public ResponseEntity<?> getEventsForGroup(@PathVariable Long groupId) {

@@ -94,3 +94,84 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* EquaLL specific styles for GroupView */
+.group-container {
+  display: grid;
+  grid-template-columns: 360px 1fr 360px;
+  gap: 16px;
+}
+.people-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.person-card {
+  background: #eef3f4;
+  border: 1px solid #cfdedf;
+  border-radius: 4px;
+  padding: 10px;
+}
+.person-card .header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.person-avatar {
+  width: 44px;
+  height: 44px;
+  background: #0891b2;
+  color: #fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:4px;
+}
+.person-name {
+  flex: 1;
+  border: 1px solid #dfe9ea;
+  padding: 8px;
+  border-radius: 4px;
+  background: #fff;
+}
+.expense-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+.expense-line input[type="text"], .expense-line input[type="number"] {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #dfe9ea;
+}
+.expense-actions { display:flex; gap:8px; align-items:center }
+.participants-popup {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  background: #fff;
+  border: 2px solid #0891b2;
+  padding: 8px;
+  border-radius: 4px;
+  min-width: 200px;
+  z-index: 40;
+}
+.calculate-area { display:flex; flex-direction:column; align-items:flex-end }
+.calculate-button {
+  background: #0891b2;
+  color: white;
+  padding: 12px 28px;
+  border-radius: 4px;
+  border: none;
+  font-size: 18px;
+}
+.more-bar { border-top:1px solid #dfe9ea; margin-top:8px; padding-top:8px; display:flex }
+.more-bar .more-input { flex:1; border:1px solid #dfe9ea; padding:8px; border-radius:4px; }
+.more-bar .more-btn { margin-left:8px; background:#fff; border:1px solid #cde; padding:6px 10px }
+
+@media (max-width: 900px) {
+  .group-container { grid-template-columns: 1fr; }
+  .calculate-area { align-items: center; }
+}

@@ -389,7 +389,7 @@ export default function HomePage({ onStart, onShowExample, darkMode }) {
           </p>
 
           <button
-            onClick={onStart}
+            onClick={() => onStart(numPeople, groupName)}
             style={{
               padding: '16px 32px',
               fontSize: 18,
